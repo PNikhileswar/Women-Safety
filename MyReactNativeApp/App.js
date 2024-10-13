@@ -12,7 +12,9 @@ import ShareLocation from './components/ShareLocation';
 import MapScreen from './components/MapScreen';
 import Chatbot from './components/chatbot';
 import AlertPage from './components/alert';
-import RecordPage from './components/record'; // Import the new AlertPage component
+import RecordPage from './components/record';
+import Period from './components/period'; 
+import Hospitals from './components/Hospitals';  // Import the new AlertPage component
 
 const Stack = createNativeStackNavigator();
 
@@ -95,6 +97,16 @@ export default function App() {
           name="Record" 
           component={RecordPage}  // Add the new Alert page here
           options={{ title: 'record' }} 
+        />
+        <Stack.Screen 
+          name="Period" 
+          component={Period}  // Add the new Alert page here
+          options={{ title: 'period' }} 
+        />
+        <Stack.Screen 
+          name="Hospitals" 
+          component={Hospitals}  // Add the new Alert page here
+          options={{ title: 'Hospitals' }} 
         />
       </Stack.Navigator>
     </NavigationContainer>

@@ -76,6 +76,7 @@ const RecordPage = () => {
   return (
     <View style={styles.container}>
       <Text style={styles.header}>Record Audio and Share</Text>
+      <Text style={styles.infoText}>Share location first and then Audio.</Text>
       {recording ? (
         <Button title="Stop Recording" onPress={stopRecording} />
       ) : (
@@ -96,6 +97,10 @@ const styles = StyleSheet.create({
   header: {
     fontSize: 24,
     fontWeight: 'bold',
+    marginBottom: 20,
+  },
+  infoText: {
+    color: '#666',
     marginBottom: 20,
   },
 });
