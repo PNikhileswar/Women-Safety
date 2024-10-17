@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { Alert, ActivityIndicator, View } from 'react-native';
 import * as Location from 'expo-location';
-
+import SplashScreen from './components/splashscreen'; // Import the SplashScreen component
 import MainPage from './components/Mainpage'; 
 import EmergencyContacts from './components/EmergencyContacts';
 import HelplineNumbers from './components/HelplineNumbers';
@@ -14,45 +13,23 @@ import Chatbot from './components/chatbot';
 import AlertPage from './components/alert';
 import RecordPage from './components/record';
 import Period from './components/period'; 
-import Hospitals from './components/Hospitals';  // Import the new AlertPage component
+import Hospitals from './components/Hospitals';
+import DaughterLocationSharing from './components/DaughterLocationSharing';
+import Registration from './components/Registration';
+import Policestation from './components/policestation';
+import Routeselector from './components/Routeselector';
 
 const Stack = createNativeStackNavigator();
 
-const requestPermissions = async () => {
-  const { status } = await Location.requestForegroundPermissionsAsync();
-  if (status !== 'granted') {
-    Alert.alert('Permission Denied', 'Location permission is required for this feature to work.');
-    return false;
-  }
-  return true;
-};
-
 export default function App() {
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const getPermissions = async () => {
-      const hasPermission = await requestPermissions();
-      setIsLoading(false); 
-      if (!hasPermission) {
-        // Handle permission denial case if necessary
-      }
-    };
-    
-    getPermissions();
-  }, []);
-
-  if (isLoading) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#0000ff" />
-      </View>
-    );
-  }
-
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="MainPage">
+      <Stack.Navigator initialRouteName="SplashScreen">
+        <Stack.Screen 
+          name="SplashScreen" 
+          component={SplashScreen} 
+          options={{ headerShown: false }} // Hide the header for the splash screen
+        />
         <Stack.Screen 
           name="MainPage" 
           component={MainPage} 
@@ -90,23 +67,43 @@ export default function App() {
         />
         <Stack.Screen 
           name="Alert" 
-          component={AlertPage}  // Add the new Alert page here
+          component={AlertPage} 
           options={{ title: 'Alert' }} 
         />
         <Stack.Screen 
           name="Record" 
-          component={RecordPage}  // Add the new Alert page here
-          options={{ title: 'record' }} 
+          component={RecordPage} 
+          options={{ title: 'Record' }} 
         />
         <Stack.Screen 
           name="Period" 
-          component={Period}  // Add the new Alert page here
-          options={{ title: 'period' }} 
+          component={Period} 
+          options={{ title: 'Period' }} 
         />
         <Stack.Screen 
           name="Hospitals" 
-          component={Hospitals}  // Add the new Alert page here
+          component={Hospitals} 
           options={{ title: 'Hospitals' }} 
+        />
+        <Stack.Screen 
+          name="DaughterLocationSharing" 
+          component={DaughterLocationSharing} 
+          options={{ title: 'Daughter Location Sharing' }} 
+        />
+         <Stack.Screen 
+          name="Registration" 
+          component={Registration} 
+          options={{ title: 'Register' }} 
+        />
+        
+        <Stack.Screen 
+          name="Policestation" 
+          component={Policestation} 
+          options={{ title: 'Policestation' }} 
+        /><Stack.Screen 
+          name="Routeselector" 
+          component={Routeselector} 
+          options={{ title: 'Routeselector' }} 
         />
       </Stack.Navigator>
     </NavigationContainer>

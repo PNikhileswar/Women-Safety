@@ -138,4 +138,4 @@ const Hospitals = () => {
   );
 };
 
-export default Hospitals;
+export default Hospitals; 
