@@ -53,6 +53,7 @@
     "react-native-fs": "^2.20.0",
     "react-native-gesture-handler": "~2.16.1",
     "react-native-image-picker": "^7.1.2",
+    "react-native-linear-gradient": "^2.8.3",
     "react-native-maps": "1.14.0",
     "react-native-network-info": "^5.2.1",
     "react-native-reanimated": "~3.10.1",
