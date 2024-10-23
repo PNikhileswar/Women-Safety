@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, SafeAreaView } from 'react-native';
 import { Magnetometer } from 'expo-sensors';

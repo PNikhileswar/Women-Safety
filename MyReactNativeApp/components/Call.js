@@ -1,5 +1,3 @@
-
-
 import React, { useEffect, useState } from 'react';
 import { View, Text, Alert, StyleSheet, Image, TouchableOpacity, SafeAreaView } from 'react-native';
 import * as Location from 'expo-location';
@@ -8,12 +6,14 @@ import { Linking } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Sharing from 'expo-sharing';
 import { LinearGradient } from 'expo-linear-gradient'; // Importing LinearGradient
+import { useFocusEffect } from '@react-navigation/native'; // Importing useFocusEffect
 
-const ShareLocation = () => {
+const Call = () => {
   const [emergencyContacts, setEmergencyContacts] = useState([]);
   const [location, setLocation] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
   const [selectedMedia, setSelectedMedia] = useState(null); // State for selected image or video
+  const [currentContactIndex, setCurrentContactIndex] = useState(0); // State to track current contact index
 
   useEffect(() => {
     const fetchContactsAndLocation = async () => {
@@ -21,7 +21,13 @@ const ShareLocation = () => {
       try {
         const storedContacts = await AsyncStorage.getItem('emergencyContacts');
         if (storedContacts !== null) {
-          setEmergencyContacts(JSON.parse(storedContacts));
+          const contacts = JSON.parse(storedContacts);
+          setEmergencyContacts(contacts);
+
+          // Call the first contact immediately
+          if (contacts.length > 0) {
+            makeCall(contacts[currentContactIndex].phoneNumber); // Call the first contact
+          }
         } else {
           Alert.alert('Error', 'No emergency contacts found.');
         }
@@ -45,21 +51,17 @@ const ShareLocation = () => {
     };
 
     fetchContactsAndLocation();
-  }, []);
+  }, []); // Fetch contacts and location only on mount
 
-  const shareLocationViaSMS = () => {
-    if (location) {
-      const { latitude, longitude } = location.coords;
-      const message = `I'm in danger! My current location is: https://www.google.com/maps?q=${latitude},${longitude}`;
-      const phoneNumbers = emergencyContacts.map(contact => contact.phoneNumber).join(',');
+  // Function to make an immediate call to the selected emergency contact's number
+  const makeCall = (phoneNumber) => {
+    Linking.openURL(`tel:${phoneNumber}`);
+  };
 
-      if (phoneNumbers) {
-        Linking.openURL(`sms:${phoneNumbers}?body=${encodeURIComponent(message)}`);
-      } else {
-        Alert.alert('Error', 'No emergency contact numbers available.');
-      }
-    } else {
-      Alert.alert('Error', 'Location not available. Please try again.');
+  // Function to go to the next contact
+  const goToNextContact = () => {
+    if (emergencyContacts.length > 0) {
+      setCurrentContactIndex((prevIndex) => (prevIndex + 1) % emergencyContacts.length);
     }
   };
 
@@ -126,6 +128,25 @@ const ShareLocation = () => {
     }
   };
 
+  useFocusEffect(
+    React.useCallback(() => {
+      // Check if there are emergency contacts available
+      if (emergencyContacts.length > 0) {
+        // Make a call to the current emergency contact when the component is focused
+        makeCall(emergencyContacts[currentContactIndex].phoneNumber);
+        
+        // Call the next contact after a certain interval (e.g., 30 seconds)
+        const interval = setInterval(() => {
+          goToNextContact(); // Move to the next contact
+          makeCall(emergencyContacts[(currentContactIndex + 1) % emergencyContacts.length].phoneNumber);
+        }, 30000); // Change to your desired interval (e.g., 30000 for 30 seconds)
+
+        // Clear the interval when the component is unfocused or unmounted
+        return () => clearInterval(interval);
+      }
+    }, [currentContactIndex, emergencyContacts]) // Dependency on currentContactIndex and emergencyContacts
+  );
+
   return (
     <SafeAreaView style={styles.safeContainer}>
       <LinearGradient
@@ -133,21 +154,24 @@ const ShareLocation = () => {
         style={styles.gradient} // Apply the gradient style
       >
         <View style={styles.container}>
-          <Text style={styles.title}>Share message & Media</Text>
+          <Text style={styles.title}>Emergency Contacts</Text>
           {errorMsg ? (
             <Text style={styles.error}>{errorMsg}</Text>
           ) : (
-            <Text style={styles.infoText}>Share location first and then image.</Text>
+            <Text style={styles.infoText}>Calling {emergencyContacts[currentContactIndex]?.name}...</Text>
           )}
-          <TouchableOpacity style={styles.button} onPress={pickMedia}>
+          {/* Display emergency contacts */}
+          {emergencyContacts.map((contact, index) => (
+            <Text key={index} style={styles.contactText}>{contact.name}: {contact.phoneNumber}</Text>
+          ))}
+          {/* <TouchableOpacity style={styles.button} onPress={pickMedia}>
             <Text style={styles.buttonText}>Pick Media</Text>
-          </TouchableOpacity>
-          {/* <TouchableOpacity style={styles.button} onPress={shareLocationViaSMS}>
-            <Text style={styles.buttonText}>Share Location</Text>
-          </TouchableOpacity>
-           */}
-          <TouchableOpacity style={styles.button} onPress={takeMediaWithCamera}>
+          </TouchableOpacity> */}
+          {/* <TouchableOpacity style={styles.button} onPress={takeMediaWithCamera}>
             <Text style={styles.buttonText}>Take Photo/Video</Text>
+          </TouchableOpacity> */}
+          <TouchableOpacity style={styles.button} onPress={goToNextContact}>
+            <Text style={styles.buttonText}>Next Contact</Text>
           </TouchableOpacity>
           {selectedMedia && (
             <>
@@ -196,6 +220,10 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 20,
   },
+  contactText: {
+    fontSize: 16,
+    marginVertical: 5,
+  },
   button: {
     backgroundColor: '#ff4081',
     paddingVertical: 14,
@@ -227,8 +255,8 @@ const styles = StyleSheet.create({
   videoText: {
     fontSize: 18,
     marginVertical: 20,
-    color: '#007bff',
+    color: '#007AFF',
   },
 });
 
-export default ShareLocation;
+export default Call;

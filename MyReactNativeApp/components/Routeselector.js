@@ -1,136 +1,156 @@
-import React, { useState, useEffect } from 'react';
-import { View, Button, Alert, Dimensions, Modal, StyleSheet, TouchableOpacity, Text, TextInput } from 'react-native';
-import MapView, { Marker, Polyline } from 'react-native-maps';
+
+
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Button, Alert, StyleSheet, TouchableOpacity, Text, TextInput, ScrollView } from 'react-native';
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
-import * as Notifications from 'expo-notifications';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import haversine from 'haversine-distance';
-import * as SMS from 'expo-sms';
 import * as TaskManager from 'expo-task-manager';
-import axios from 'axios'; // Add axios for API calls
+import * as Notifications from 'expo-notifications';
+import axios from 'axios';
+import haversine from 'haversine';
 
-const LOCATION_TASK_NAME = 'location-tracking';
+const LOCATION_TASK_NAME = 'background-location-task';
+const DEVIATION_THRESHOLD = 50;
 
-const RouteSelector = () => {
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
+
+export default function Component() {
   const [currentLocation, setCurrentLocation] = useState(null);
   const [startLocation, setStartLocation] = useState(null);
   const [endLocation, setEndLocation] = useState(null);
-  const [route, setRoute] = useState([]);
-  const [tracking, setTracking] = useState(false);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
+  const [routes, setRoutes] = useState([]);
+  const [selectedRoute, setSelectedRoute] = useState(null);
   const [searchInput, setSearchInput] = useState("");
-  const [searchResults, setSearchResults] = useState([]); // State to hold search results
+  const [searchResults, setSearchResults] = useState([]);
+  const [isTracking, setIsTracking] = useState(false);
+  const searchTimeoutRef = useRef(null);
+  const mapRef = useRef(null);
 
   useEffect(() => {
-    const getPermissionsAndLoadData = async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
+    const setupLocationAndNotifications = async () => {
+      const { status: locationStatus } = await Location.requestForegroundPermissionsAsync();
+      if (locationStatus !== 'granted') {
         Alert.alert('Location permission denied');
         return;
       }
 
-      const savedRoute = await AsyncStorage.getItem('savedRoute');
-      const savedTracking = await AsyncStorage.getItem('tracking');
-
-      if (savedRoute) {
-        const routeData = JSON.parse(savedRoute);
-        setStartLocation(routeData.startLocation);
-        setEndLocation(routeData.endLocation);
-        setRoute(routeData.route);
-      }
-
-      if (savedTracking === 'true') {
-        setTracking(true);
-        await startTracking();
+      const { status: notificationStatus } = await Notifications.requestPermissionsAsync();
+      if (notificationStatus !== 'granted') {
+        Alert.alert('Notification permission denied');
+        return;
       }
 
       const location = await Location.getCurrentPositionAsync({});
-      setCurrentLocation({
+      const initialRegion = {
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      });
-
-      await Notifications.requestPermissionsAsync();
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+      };
+      setCurrentLocation(initialRegion);
+      setStartLocation(initialRegion);
     };
-    getPermissionsAndLoadData();
+
+    setupLocationAndNotifications();
   }, []);
 
   useEffect(() => {
-    if (tracking && currentLocation && route.length > 0) {
-      checkDeviationFromRoute(currentLocation);
+    if (searchInput.trim().length > 0) {
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+      searchTimeoutRef.current = setTimeout(() => {
+        fetchPlaces(searchInput.trim());
+      }, 300);
+    } else {
+      setSearchResults([]);
     }
-  }, [currentLocation, tracking]);
+    return () => {
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    };
+  }, [searchInput]);
 
-  const handleMapPress = (event) => {
-    const { latitude, longitude } = event.nativeEvent.coordinate;
-
-    if (isEditing) {
-      if (!startLocation) {
-        setStartLocation({ latitude, longitude });
-        setRoute([{ latitude, longitude }]);
-      } else if (!endLocation) {
-        setEndLocation({ latitude, longitude });
-        setRoute([...route, { latitude, longitude }]);
-      }
-    }
-  };
-
-  // Fetch places from Twilio API
   const fetchPlaces = async (query) => {
     try {
-      const response = await axios.get(`YOUR_TWILIO_API_ENDPOINT?query=${query}`, {
-        headers: {
-          'Authorization': `Basic ${btoa('AC1e8bbb02379e0cfcdd564da8023d9a02:51fc3df3a73f48ac560b4c7e2ea0ac82')}`, // Encode SID and Auth Token
-        },
-      });
-      // Assuming the response contains an array of place objects
-      setSearchResults(response.data.places); // Adjust based on the actual response structure
+      const response = await axios.get(
+        `https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=5`,
+        {
+          headers: {
+            'User-Agent': 'YourAppName/1.0', // Replace with your app name and version
+          }
+        }
+      );
+      setSearchResults(response.data);
     } catch (error) {
       console.error("Error fetching places:", error);
-      Alert.alert('Error fetching places');
+      Alert.alert('Error fetching places', 'Please try again later.');
     }
   };
 
-  // Search for a place
-  const handleSearch = () => {
-    if (searchInput.trim()) {
-      fetchPlaces(searchInput.trim());
-    } else {
-      Alert.alert('Please enter a place name.');
-    }
-  };
-
-  // Select a place from search results
   const selectPlace = (place) => {
-    setCurrentLocation({
-      latitude: place.latitude, // Adjust according to your place object
-      longitude: place.longitude,
+    const newLocation = {
+      latitude: parseFloat(place.lat),
+      longitude: parseFloat(place.lon),
       latitudeDelta: 0.05,
       longitudeDelta: 0.05,
-    });
-    setSearchInput(""); // Clear the search input
-    setSearchResults([]); // Clear search results
+    };
+
+    setEndLocation(newLocation);
+    fetchRoutes(startLocation, newLocation);
+    setSearchInput("");
+    setSearchResults([]);
+
+    if (mapRef.current && startLocation) {
+      mapRef.current.fitToCoordinates([startLocation, newLocation], {
+        edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
+        animated: true,
+      });
+    }
   };
 
-  const saveRoute = async () => {
-    if (startLocation && endLocation) {
-      const routeData = {
-        startLocation,
-        endLocation,
-        route: [...route],
-      };
-      await AsyncStorage.setItem('savedRoute', JSON.stringify(routeData));
-      Alert.alert('Route saved!');
-      setIsEditing(false);
-    } else {
-      Alert.alert('Please select both start and end points');
+  const fetchRoutes = async (start, end) => {
+    try {
+      const response = await axios.get(`http://router.project-osrm.org/route/v1/driving/${start.longitude},${start.latitude};${end.longitude},${end.latitude}?overview=full&geometries=geojson&alternatives=true`);
+      if (response.data.routes && response.data.routes.length > 0) {
+        const fetchedRoutes = response.data.routes.map(route => ({
+          points: route.geometry.coordinates.map(([longitude, latitude]) => ({ latitude, longitude })),
+          duration: route.duration,
+          distance: route.distance,
+        }));
+        setRoutes(fetchedRoutes);
+        setSelectedRoute(0);
+      } else {
+        Alert.alert('No routes found');
+      }
+    } catch (error) {
+      console.error("Error fetching routes:", error);
+      Alert.alert('Error fetching routes');
     }
+  };
+
+  const renderRoutes = () => {
+    return routes.map((route, index) => (
+      <Polyline
+        key={index}
+        coordinates={route.points}
+        strokeColor={selectedRoute === index ? 'red' : `hsl(${index * 60}, 100%, 50%)`}
+        strokeWidth={selectedRoute === index ? 6 : 4}
+        tappable
+        onPress={() => setSelectedRoute(index)}
+      />
+    ));
   };
 
   const startTracking = async () => {
+    if (selectedRoute === null) {
+      Alert.alert('Please select a route first');
+      return;
+    }
+
     const { status } = await Location.requestBackgroundPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Background location permission denied');
@@ -138,122 +158,137 @@ const RouteSelector = () => {
     }
 
     await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
-      accuracy: Location.Accuracy.High,
+      accuracy: Location.Accuracy.Balanced,
       timeInterval: 10000,
       distanceInterval: 10,
+      foregroundService: {
+        notificationTitle: 'Route Tracking',
+        notificationBody: 'Tracking your route in the background',
+      },
     });
 
-    await AsyncStorage.setItem('tracking', 'true');
-    setTracking(true);
+    setIsTracking(true);
   };
 
   const stopTracking = async () => {
     await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
-    await AsyncStorage.setItem('tracking', 'false');
-    setTracking(false);
+    setIsTracking(false);
   };
 
-  const checkDeviationFromRoute = (currentLocation) => {
-    let deviated = true;
+  TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
+    if (error) {
+      console.error(error);
+      return;
+    }
+    if (data) {
+      const { locations } = data;
+      const currentLocation = locations[0].coords;
 
-    route.forEach((point) => {
-      const distance = haversine(currentLocation, point);
-      if (distance <= 50) { // Change the deviation threshold to 50 meters
-        deviated = false;
+      if (selectedRoute !== null && routes[selectedRoute] && routes[selectedRoute].points) {
+        const closestPointOnRoute = findClosestPointOnRoute(currentLocation, routes[selectedRoute].points);
+        const distanceFromRoute = haversine(currentLocation, closestPointOnRoute);
+
+        if (distanceFromRoute > DEVIATION_THRESHOLD) {
+          await Notifications.scheduleNotificationAsync({
+            content: {
+              title: 'Route Deviation Alert',
+              body: 'You have deviated from your selected route by more than 50 meters!',
+            },
+            trigger: null,
+          });
+        }
       }
-    });
-
-    if (deviated) {
-      sendSMS();  
-      sendNotification();  
     }
-  };
+  });
 
-  const sendSMS = async () => {
-    const isAvailable = await SMS.isAvailableAsync();
-    if (isAvailable) {
-      await SMS.sendSMSAsync(['9381017897'], 'I have deviated from the route');
-    } else {
-      Alert.alert('SMS is not available on this device');
+  const findClosestPointOnRoute = (currentLocation, routePoints) => {
+    let closestPoint = routePoints[0];
+    let minDistance = haversine(currentLocation, routePoints[0]);
+
+    for (let i = 1; i < routePoints.length; i++) {
+      const distance = haversine(currentLocation, routePoints[i]);
+      if (distance < minDistance) {
+        minDistance = distance;
+        closestPoint = routePoints[i];
+      }
     }
-  };
 
-  const sendNotification = async () => {
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: 'Route Deviation Alert',
-        body: 'You have deviated from your route!',
-      },
-      trigger: null,
-    });
-  };
-
-  const editRoute = () => {
-    setIsEditing(true);
-    setStartLocation(null);  
-    setEndLocation(null);    
-    setRoute([]);            
+    return closestPoint;
   };
 
   return (
     <View style={styles.container}>
       {currentLocation && (
         <MapView
+          ref={mapRef}
+          provider={PROVIDER_GOOGLE}
           style={styles.map}
-          region={currentLocation}
-          onPress={handleMapPress}
+          initialRegion={currentLocation}
           showsUserLocation
-          loadingEnabled
         >
-          {startLocation && <Marker coordinate={startLocation} title="Start" />}
-          {endLocation && <Marker coordinate={endLocation} title="End" />}
-          {route.length > 1 && <Polyline coordinates={route} strokeColor="blue" strokeWidth={4} />}
+          {startLocation && (
+            <Marker coordinate={startLocation} pinColor="green">
+              <View style={styles.markerContainer}>
+                <Text style={styles.markerText}>Start</Text>
+              </View>
+            </Marker>
+          )}
+          {endLocation && (
+            <Marker coordinate={endLocation} pinColor="red">
+              <View style={styles.markerContainer}>
+                <Text style={styles.markerText}>End</Text>
+              </View>
+            </Marker>
+          )}
+          {renderRoutes()}
         </MapView>
       )}
 
-      {/* Search Bar */}
       <View style={styles.searchContainer}>
         <TextInput
           style={styles.searchInput}
-          placeholder="Search for a place"
+          placeholder="Search for a destination"
           value={searchInput}
           onChangeText={setSearchInput}
         />
-        <TouchableOpacity style={styles.searchButton} onPress={handleSearch}>
-          <Text style={styles.searchButtonText}>Search</Text>
-        </TouchableOpacity>
       </View>
 
-      {/* Display search results */}
       {searchResults.length > 0 && (
-        <View style={styles.resultsContainer}>
+        <ScrollView style={styles.resultsContainer}>
           {searchResults.map((place, index) => (
             <TouchableOpacity key={index} onPress={() => selectPlace(place)}>
-              <Text style={styles.resultText}>{place.name}</Text> {/* Adjust based on your place object structure */}
+              <Text style={styles.resultText}>
+                {place.display_name || "Unknown Place"}
+              </Text>
             </TouchableOpacity>
           ))}
-        </View>
+        </ScrollView>
       )}
 
       <View style={styles.buttonContainer}>
-        <Button title="Save Route" onPress={saveRoute} />
-        {!tracking ? (
-          <Button title="Start Tracking" onPress={startTracking} />
-        ) : (
-          <Button title="Stop Tracking" onPress={stopTracking} />
-        )}
-        {startLocation && endLocation && !isEditing && (
-          <Button title="Edit Route" onPress={editRoute} />
-        )}
-        {isEditing && (
-          <Button title="Done Editing" onPress={() => setIsEditing(false)} />
+        <Button
+          title="Reset"
+          onPress={() => {
+            setEndLocation(null);
+            setRoutes([]);
+            setSelectedRoute(null);
+            stopTracking();
+            if (mapRef.current && startLocation) {
+              mapRef.current.animateToRegion(startLocation, 1000);
+            }
+          }}
+        />
+        {selectedRoute !== null && (
+          <Button
+            title={isTracking ? "Stop Ride" : "Start Ride"}
+            onPress={isTracking ? stopTracking : startTracking}
+          />
         )}
       </View>
     </View>
   );
-};
+}
 
-// Styling for UI
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -266,24 +301,13 @@ const styles = StyleSheet.create({
     top: 40,
     left: 20,
     right: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: 'white',
     borderRadius: 5,
     elevation: 5,
   },
   searchInput: {
-    flex: 1,
     height: 40,
     paddingHorizontal: 10,
-  },
-  searchButton: {
-    padding: 10,
-    backgroundColor: 'blue',
-    borderRadius: 5,
-  },
-  searchButtonText: {
-    color: 'white',
   },
   resultsContainer: {
     position: 'absolute',
@@ -300,54 +324,20 @@ const styles = StyleSheet.create({
   },
   buttonContainer: {
     position: 'absolute',
-    bottom: 40,
+    bottom: 20,
     left: 20,
     right: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
+  markerContainer: {
+    backgroundColor: 'white',
+    padding: 5,
+    borderRadius: 5,
+    borderColor: 'black',
+    borderWidth: 1,
+  },
+  markerText: {
+    fontWeight: 'bold',
+  },
 });
-
-export default RouteSelector;
-
-
-TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
-  if (error) {
-    console.error(error);
-    return;
-  }
-  if (data) { 
-    const { locations } = data;
-    const currentLocation = locations[0].coords;
-    
-    // Perform route deviation check in background
-    let savedRoute = await AsyncStorage.getItem('savedRoute');
-    if (savedRoute) {
-      savedRoute = JSON.parse(savedRoute);
-      const route = savedRoute.route;
-
-      let deviated = true;
-      route.forEach((point) => {
-        const distance = haversine(currentLocation, point);
-        if (distance <= 50) { 
-          deviated = false;
-        }
-      });
-
-      if (deviated) {
-        // Send SMS and Notification in background
-        const isAvailable = await SMS.isAvailableAsync();
-        if (isAvailable) {
-          await SMS.sendSMSAsync(['1234567890'], 'I have deviated from the route');
-        }
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            title: 'Route Deviation Alert',
-            body: 'You have deviated from your route!',
-          },
-          trigger: null,
-        });
-      }
-    }
-  }
-}); 

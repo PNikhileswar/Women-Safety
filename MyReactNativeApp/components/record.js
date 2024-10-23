@@ -1,8 +1,9 @@
-// Record.js
+
 import React, { useState } from 'react';
-import { View, Button, Text, Alert, StyleSheet } from 'react-native';
+import { View, Text, Alert, StyleSheet, SafeAreaView, TouchableOpacity } from 'react-native';
 import { Audio } from 'expo-av';
 import * as Sharing from 'expo-sharing'; // Import expo-sharing
+import { LinearGradient } from 'expo-linear-gradient'; // Import LinearGradient
 
 const RecordPage = () => {
   const [recording, setRecording] = useState(null);
@@ -74,34 +75,104 @@ const RecordPage = () => {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.header}>Record Audio and Share</Text>
-      <Text style={styles.infoText}>Share location first and then Audio.</Text>
-      {recording ? (
-        <Button title="Stop Recording" onPress={stopRecording} />
-      ) : (
-        <Button title="Start Recording" onPress={startRecording} />
-      )}
-      {audioUri && <Button title="Share Recording" onPress={shareRecording} />}
-    </View>
+    <SafeAreaView style={styles.safeContainer}>
+      <LinearGradient
+        colors={['#FFEBEE', '#FFCDD2', '#E1F5FE', '#B3E5FC', '#B2EBF2']}
+        style={styles.gradient}
+      >
+        <View style={styles.container}>
+          <Text style={styles.header}>Record Audio and Share</Text>
+          <Text style={styles.infoText}>Share location first and then Audio.</Text>
+
+          {recording ? (
+            <TouchableOpacity style={styles.stopButton} onPress={stopRecording}>
+              <Text style={styles.buttonText}>Stop Recording</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={styles.startButton} onPress={startRecording}>
+              <Text style={styles.buttonText}>Start Recording</Text>
+            </TouchableOpacity>
+          )}
+
+          {audioUri && (
+            <TouchableOpacity style={styles.shareButton} onPress={shareRecording}>
+              <Text style={styles.buttonText}>Share Recording</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </LinearGradient>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  safeContainer: {
+    flex: 1,
+  },
+  gradient: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
+  container: {
+    alignItems: 'center',
+    width: '100%',
+    padding: 20,
+  },
   header: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
     marginBottom: 20,
+    color: '#D32F2F',
   },
   infoText: {
     color: '#666',
     marginBottom: 20,
+    textAlign: 'center',
+    fontSize: 16,
+  },
+  startButton: {
+    backgroundColor: '#1976D2',
+    paddingVertical: 15,
+    paddingHorizontal: 40,
+    borderRadius: 25,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  stopButton: {
+    backgroundColor: '#B71C1C',
+    paddingVertical: 15,
+    paddingHorizontal: 40,
+    borderRadius: 25,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  shareButton: {
+    backgroundColor: '#4CAF50',
+    paddingVertical: 15,
+    paddingHorizontal: 40,
+    borderRadius: 25,
+    marginTop: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  buttonText: {
+    color: '#FFF',
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
   },
 });
 

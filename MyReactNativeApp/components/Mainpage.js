@@ -1,11 +1,14 @@
+
+
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, Linking, ScrollView, SafeAreaView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, Linking, ScrollView, SafeAreaView, Modal } from 'react-native';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import MotionDetection from './Motiondetection'; // Assuming this is your motion detection logic
 import * as Animatable from 'react-native-animatable';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Icon } from 'react-native-elements';
+import MapView, { Marker } from 'react-native-maps';
+import Motiondetection from './Motiondetection'; // Importing the Motiondetection component
 
 // TabIcon component definition
 const TabIcon = ({ title, icon, color, navigation, targetScreen, action }) => {
@@ -32,15 +35,28 @@ const FeatureBox = ({ title, icon, color, navigation, targetScreen }) => {
   );
 };
 
-// LocationSharingButton component definition
 const LocationSharingButton = ({ fetchAndShareLocation }) => {
   return (
-    <TouchableOpacity
-      style={styles.shareButton}
-      onPress={fetchAndShareLocation}
+    <Animatable.View
+      animation="zoomIn"
+      iterationCount="infinite"
+      direction="alternate"
+      duration={2000}
+      style={styles.animatableContainer}
     >
-      <Text style={styles.shareButtonText}>Share My Location</Text>
-    </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.shareButtonRounded}
+        onPress={fetchAndShareLocation}
+      >
+        <Icon
+          name="location-on"
+          size={24}
+          color="white"
+          style={styles.iconStyle}
+        />
+        <Text style={styles.shareButtonText}>Share Live Location</Text>
+      </TouchableOpacity>
+    </Animatable.View>
   );
 };
 
@@ -49,6 +65,8 @@ const MainPage = ({ navigation }) => {
   const [errorMsg, setErrorMsg] = useState(null);
   const [isRegistered, setIsRegistered] = useState(false);
   const [emergencyContacts, setEmergencyContacts] = useState([]);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [isMapVisible, setIsMapVisible] = useState(false);
 
   const checkRegistration = async () => {
     try {
@@ -99,14 +117,15 @@ const MainPage = ({ navigation }) => {
   const shareLocationViaSMS = () => {
     if (location) {
       const { latitude, longitude } = location.coords;
-      const message = `I'm in danger! My current location is: https://www.google.com/maps?q=${latitude},${longitude}`;
+      const message =` I'm in danger! My current location is: https://www.google.com/maps?q=${latitude},${longitude}`;
       const phoneNumbers = emergencyContacts.map(contact => contact.phoneNumber).join(',');
-
+      
       if (phoneNumbers) {
         Linking.openURL(`sms:${phoneNumbers}?body=${encodeURIComponent(message)}`);
       } else {
         Alert.alert('Error', 'No emergency contact numbers available.');
       }
+      
     } else {
       Alert.alert('Error', 'Location not available. Please try again.');
     }
@@ -117,9 +136,18 @@ const MainPage = ({ navigation }) => {
     shareLocationViaSMS();
   };
 
+  const openLiveLocation = async () => {
+    await fetchLocation();
+    if (location) {
+      setIsMapVisible(true);
+    } else {
+      Alert.alert('Error', 'Unable to fetch location. Try again.');
+    }
+  };
+
   useEffect(() => {
     checkRegistration();
-    fetchEmergencyContacts(); // Load emergency contacts when the component mounts
+    fetchEmergencyContacts();
   }, []);
 
   return (
@@ -133,37 +161,100 @@ const MainPage = ({ navigation }) => {
             <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.menuIcon}>
               <Icon name="menu" size={30} color="black" />
             </TouchableOpacity>
-            <Animatable.Text animation="fadeInUp" style={styles.header}>
-              Welcome to Protection App
-            </Animatable.Text>
           </View>
 
-          <TouchableOpacity style={[styles.box, styles.largeBox]}>
+          {/* <TouchableOpacity style={[styles.box, styles.largeBox]}>
             <Text style={styles.largeBoxText}>Motion Detection & Normal Motion</Text>
-          </TouchableOpacity>
+          </TouchableOpacity> */}
+
+          {/* Motiondetection component included */}
+          <Motiondetection />
 
           <LocationSharingButton fetchAndShareLocation={fetchAndShareLocation} />
 
           <View style={styles.boxContainer}>
             <FeatureBox title="Emergency Contacts" icon="contacts" color="#ff6f61" navigation={navigation} targetScreen="EmergencyContacts" />
+            <FeatureBox title="call" icon="phone-in-talk" color="#ff5722" navigation={navigation} targetScreen="Call" />
             <FeatureBox title="Camera Detection" icon="camera-alt" color="#4caf50" navigation={navigation} targetScreen="CameraDetection" />
-            <FeatureBox title="Share Location & Media" icon="perm-media" color="#2196f3" navigation={navigation} targetScreen="ShareLocation" />
+            <FeatureBox title="Share Media" icon="perm-media" color="#2196f3" navigation={navigation} targetScreen="ShareLocation" />
             <FeatureBox title="Set Alert (SOS)" icon="warning" color="#ff9800" navigation={navigation} targetScreen="Alert" />
             <FeatureBox title="Record Audio" icon="mic" color="#673ab7" navigation={navigation} targetScreen="Record" />
             <FeatureBox title="Period Predictor" icon="calendar-today" color="#ff5722" navigation={navigation} targetScreen="Period" />
             <FeatureBox title="Nearby Hospitals" icon="local-hospital" color="#3f51b5" navigation={navigation} targetScreen="Hospitals" />
             <FeatureBox title="Nearby Police Stations" icon="security" color="#009688" navigation={navigation} targetScreen="Policestation" />
             <FeatureBox title="Route Selection" icon="directions" color="#9c27b0" navigation={navigation} targetScreen="Routeselector" />
+            <FeatureBox title="Helpline" icon="phone-in-talk" color="#ff5722" navigation={navigation} targetScreen="Helpline" />
+            <FeatureBox title="Whatsappstatus" icon="phone" color="#ff5982" navigation={navigation} targetScreen="Whatsappstatus" />
+
           </View>
         </ScrollView>
 
         <View style={styles.bottomBar}>
           <TabIcon title="Home" icon="home" color="#ff9800" navigation={navigation} targetScreen="MainPage" />
-          <TabIcon title="Chatbot" icon="chat" color="#4caf50" navigation={navigation} targetScreen="Chatbot" />
-          <TabIcon title="Location" icon="location-on" color="#2196f3" action={fetchAndShareLocation} />
+          {/* <TabIcon title="Chatbot" icon="chat" color="#4caf50" navigation={navigation} targetScreen="Chatbot" /> */}
+          <TabIcon title="Location" icon="location-on" color="#2196f3" action={openLiveLocation}/>
           <TabIcon title="Register" icon="app-registration" color="#673ab7" navigation={navigation} targetScreen="Registration" />
         </View>
+
+        {isMapVisible && location && (
+          <MapView
+            style={styles.map}
+            initialRegion={{
+              latitude: location.coords.latitude,
+              longitude: location.coords.longitude,
+              latitudeDelta: 0.01,
+              longitudeDelta: 0.01,
+            }}
+          >
+           
+            <Marker
+              coordinate={{
+                latitude: location.coords.latitude,
+                longitude: location.coords.longitude,
+              }}
+              title="You are here"
+            />
+          </MapView>
+        )}
       </LinearGradient>
+
+      <Modal
+        visible={modalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+          <TouchableOpacity style={styles.modalOption} onPress={() => {
+              setModalVisible(false);
+              Alert.alert('About Hershield', 
+    'Hershield is a dedicated womenÅs safety app designed to empower women and enhance their personal security. Our mission is to provide tools and resources that ensure safety and support during emergencies. Key features of the app include:\n\n' +
+    '1. **Emergency Contacts:** Quickly alert friends or family in times of distress.\n' +
+    '2. **Live Location Sharing:** Share your location with trusted contacts to enhance your safety.\n' +
+    '3. **SOS Alerts:** Instantly send distress signals to emergency services and contacts.\n' +
+    '4. **Motion Detection:** Get notified of unusual movements around you for added security.\n' +
+    '5. **Nearby Assistance:** Find nearby hospitals and police stations at your fingertips.\n\n' +
+    'We believe that safety is a fundamental right, and with Hershield, you can feel more secure and confident in your daily life. Together, letcs create a safer environment for everyone.');
+            }}>
+              <Icon name="info" size={30} color="black" />
+              <Text style={styles.modalText}>About</Text>
+            </TouchableOpacity>
+          
+
+            <TouchableOpacity style={styles.modalOption} onPress={() => {
+              setModalVisible(false);
+              Alert.alert('App Guidelines', '1. Register your details for accurate location sharing.\n2. Add emergency contacts.\n3. Use the SOS feature in case of danger.\n4. Share your location with contacts in emergencies.');
+            }}>
+              <Icon name="rule" size={30} color="black" />
+              <Text style={styles.modalText}>App Guidelines</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.closeButton} onPress={() => setModalVisible(false)}>
+              <Text style={styles.closeButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -185,14 +276,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: '100%',
   },
-  header: {
-    flex: 1,
-    fontSize: 24,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
   menuIcon: {
     marginRight: 10,
+    marginTop: 15,
   },
   boxContainer: {
     flexDirection: 'row',
@@ -201,9 +287,9 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   box: {
-    width: '48%',
+    width: '45%', // Decreased width
     marginBottom: 20,
-    padding: 20,
+    padding: 15, // Decreased padding
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 10,
@@ -233,12 +319,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
   },
+  shareButtonRounded: {
+    backgroundColor: '#2196f3',
+    padding: 15,
+    borderRadius: 100, // Make the button fully rounded
+    width: 150,
+    height: 150,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
   bottomBar: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
     padding: 10,
-    backgroundColor: '#fff',
+    backgroundColor: 'transparent',
   },
   tabIconContainer: {
     alignItems: 'center',
@@ -246,6 +342,44 @@ const styles = StyleSheet.create({
   tabIconText: {
     marginTop: 5,
     fontSize: 12,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    padding: 20,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  modalOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 15,
+  },
+  modalText: {
+    fontSize: 18,
+    marginLeft: 10,
+  },
+  closeButton: {
+    marginTop: 20,
+    padding: 15,
+    backgroundColor: '#ff9800',
+    borderRadius: 5,
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    color: 'white',
+    fontSize: 16,
+  },
+  map: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
   },
 });
 

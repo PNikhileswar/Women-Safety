@@ -1,6 +1,11 @@
+
+
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, Alert, ScrollView } from 'react-native';
+import { View, Text, TextInput, Button, StyleSheet, Alert, ScrollView, TouchableOpacity } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 const Registration = () => {
   const [name, setName] = useState('');
@@ -10,13 +15,12 @@ const Registration = () => {
   const [email, setEmail] = useState('');
   const [parentPhoneNumber, setParentPhoneNumber] = useState('');
   const [isEditMode, setIsEditMode] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
-  // Load user details when the component mounts
   useEffect(() => {
     loadUserDetails();
   }, []);
 
-  // Function to load user details from AsyncStorage
   const loadUserDetails = async () => {
     try {
       const storedName = await AsyncStorage.getItem('userName');
@@ -39,11 +43,9 @@ const Registration = () => {
     }
   };
 
-  // Function to save user details in AsyncStorage
   const saveUserDetails = async () => {
     if (name && phoneNumber && dob && place && email && parentPhoneNumber) {
-      // Basic validation for email and phone number
-      const phoneRegex = /^[0-9]{10}$/; // Example for 10 digit phone number
+      const phoneRegex = /^[0-9]{10}$/;
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
       if (!phoneRegex.test(phoneNumber) || !phoneRegex.test(parentPhoneNumber)) {
@@ -74,93 +76,138 @@ const Registration = () => {
     }
   };
 
-  // Function to enable editing
   const enableEditing = () => {
     setIsEditMode(false);
   };
 
+  const onDateChange = (event, selectedDate) => {
+    const currentDate = selectedDate || dob;
+    setShowDatePicker(false);
+    setDob(currentDate.toLocaleDateString());
+  };
+
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>User Registration</Text>
-      
-      <TextInput
-        style={styles.input}
-        placeholder="Enter your name"
-        value={name}
-        editable={!isEditMode}
-        onChangeText={setName}
-      />
-      
-      <TextInput
-        style={styles.input}
-        placeholder="Enter your phone number"
-        value={phoneNumber}
-        editable={!isEditMode}
-        onChangeText={setPhoneNumber}
-        keyboardType="numeric"
-      />
+    <SafeAreaView style={styles.safeContainer}>
+      <LinearGradient
+        colors={['#FFEBEE', '#FFCDD2', '#E1F5FE', '#B3E5FC', '#B2EBF2']}
+        style={styles.gradient}
+      >
+        <ScrollView contentContainerStyle={styles.container}>
+          <Text style={styles.title}>User Registration</Text>
+          
+          <TextInput
+            style={styles.input}
+            placeholder="Enter your name"
+            value={name}
+            editable={!isEditMode}
+            onChangeText={setName}
+          />
+          
+          <TextInput
+            style={styles.input}
+            placeholder="Enter your phone number"
+            value={phoneNumber}
+            editable={!isEditMode}
+            onChangeText={setPhoneNumber}
+            keyboardType="numeric"
+          />
 
-      <TextInput
-        style={styles.input}
-        placeholder="Enter your date of birth"
-        value={dob}
-        editable={!isEditMode}
-        onChangeText={setDob}
-      />
+          <TouchableOpacity onPress={() => setShowDatePicker(true)} style={styles.input}>
+            <Text style={styles.dateText}>{dob ? `DOB: ${dob}` : 'Select your date of birth'}</Text>
+          </TouchableOpacity>
+          {showDatePicker && (
+            <DateTimePicker
+              value={new Date()}
+              mode="date"
+              display="default"
+              onChange={onDateChange}
+            />
+          )}
 
-      <TextInput
-        style={styles.input}
-        placeholder="Enter your place"
-        value={place}
-        editable={!isEditMode}
-        onChangeText={setPlace}
-      />
+          <TextInput
+            style={styles.input}
+            placeholder="Enter your place"
+            value={place}
+            editable={!isEditMode}
+            onChangeText={setPlace}
+          />
 
-      <TextInput
-        style={styles.input}
-        placeholder="Enter your email"
-        value={email}
-        editable={!isEditMode}
-        onChangeText={setEmail}
-        keyboardType="email-address"
-      />
+          <TextInput
+            style={styles.input}
+            placeholder="Enter your email"
+            value={email}
+            editable={!isEditMode}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+          />
 
-      <TextInput
-        style={styles.input}
-        placeholder="Enter your parent's phone number"
-        value={parentPhoneNumber}
-        editable={!isEditMode}
-        onChangeText={setParentPhoneNumber}
-        keyboardType="numeric"
-      />
+          <TextInput
+            style={styles.input}
+            placeholder="Enter your parent's phone number"
+            value={parentPhoneNumber}
+            editable={!isEditMode}
+            onChangeText={setParentPhoneNumber}
+            keyboardType="numeric"
+          />
 
-      {!isEditMode ? (
-        <Button title="Save Details" onPress={saveUserDetails} />
-      ) : (
-        <Button title="Edit Details" onPress={enableEditing} />
-      )}
-    </ScrollView>
+          {!isEditMode ? (
+            <TouchableOpacity style={styles.button} onPress={saveUserDetails}>
+              <Text style={styles.buttonText}>Save Details</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={styles.button} onPress={enableEditing}>
+              <Text style={styles.buttonText}>Edit Details</Text>
+            </TouchableOpacity>
+          )}
+        </ScrollView>
+      </LinearGradient>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeContainer: {
+    flex: 1,
+  },
+  gradient: {
+    flex: 1,
+    padding: 20,
+  },
   container: {
     flexGrow: 1,
     padding: 20,
     justifyContent: 'center',
   },
   title: {
-    fontSize: 24,
+    fontSize: 26,
     marginBottom: 20,
     textAlign: 'center',
     fontWeight: 'bold',
+    color: '#333',
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 5,
-    padding: 10,
-    marginBottom: 15,
+    borderWidth: 2,
+    borderColor: '#0288D1',
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 20,
+    backgroundColor: '#FFF',
+  },
+  dateText: {
+    fontSize: 16,
+    color: '#666',
+  },
+  button: {
+    backgroundColor: '#0288D1',
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  buttonText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 
